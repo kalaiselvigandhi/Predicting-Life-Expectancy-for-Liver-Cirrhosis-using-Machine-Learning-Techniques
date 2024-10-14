@@ -1,0 +1,371 @@
+#To open the csv file:
+setwd(dirname(file.choose()))
+getwd ()
+cirrhosis_prediction <- read.csv ("cirrhosis_prediction.csv", stringsAsFactors = FALSE)
+str(cirrhosis_prediction)
+#DATA EXPLORATION PART – SECTION 1:
+#Visualize the missing values:
+library (Amelia)
+library(funModeling)
+library(tidyverse)
+apply (cirrhosis_prediction, MARGIN = 2, FUN = function(x) sum(is.na(x)))
+missmap (cirrhosis_prediction, col = c("yellow","black"), legend = FALSE)
+str(cirrhosis_prediction)
+#putting the numeric variables into a data frame:
+cirrhosis_prediction_2 <- data.frame(cirrhosis_prediction$ID, cirrhosis_prediction$N_Days, cirrhosis_prediction$Age, cirrhosis_prediction$Bilirubin, cirrhosis_prediction$Cholesterol, cirrhosis_prediction$Albumin, cirrhosis_prediction$lifeExpectancy)
+colnames(cirrhosis_prediction_2) <- c("ID","N_Days","Age","Bilirubin","cholestrol","Albumin","lifeExpectancy")
+str(cirrhosis_prediction_2)
+View(cirrhosis_prediction_2)
+#Box plot for all numeric variables:
+boxplot (cirrhosis_prediction_2, main="Boxplot for Cirrhosis Prediction", xlab= "Dependent and Independant Variables",ylab="count",col="Bisque")
+#Replacing the outlier functions:
+replace_outlier <- function(x) {
+  for (i in which (sapply (x, is.numeric))) {
+    quantiles <- quantile (x [, i], c (.05, .95), na.rm =TRUE)
+    x [, i] = ifelse (x [, i] < quantiles [1], quantiles [1], x [, i])
+    x [, i] = ifelse (x [, i] > quantiles [2], quantiles [2], x [, i])}
+  x}
+# Replacing extreme values with percentiles
+cirrhosis_prediction_2 = replace_outlier(cirrhosis_prediction_2)
+boxplot (cirrhosis_prediction_2, xlab="numerical values", ylab="Count", col="Bisque", main="Outliers Replaced:")
+# Examining box plot for Life Expectancy with No. of Days and status:
+library(ggplot2)
+str(cirrhosis_prediction)
+#Normalization (3 Methods Used):
+#1st Method min-max scaling:
+cirrhosis_prediction_2.mms<- apply (cirrhosis_prediction_2, MARGIN = 2, FUN = function(x) (x - min(x))/diff(range(x)))
+boxplot (cirrhosis_prediction_2.mms, main= "Min Max Scaling", xlab="numerical values", ylab="count")
+#2nd Method z-score:
+cirrhosis_prediction_2.z1 <- apply (cirrhosis_prediction_2, MARGIN = 2, FUN = function(x) (x - mean(x))/sd(x))
+cirrhosis_prediction_2.z2 <- apply (cirrhosis_prediction_2, MARGIN = 2, FUN = function(x) (x - mean(x))/(2*sd(x)))
+boxplot (cirrhosis_prediction_2.z1, main= "Standard deviation 1", xlab="numerical values", ylab="count")
+boxplot (cirrhosis_prediction_2.z2, main= "Standard deviation 2", xlab="numerical values", ylab="count")
+##3rd Method soft Max Scaling:
+library (DMwR2)
+help (SoftMax)
+sts <- apply (cirrhosis_prediction_2, MARGIN = 2, FUN = function(x) (SoftMax (x,lambda = 1, mean(x), sd(x))))
+boxplot (sts, main = "Soft Max, lambda = 1")
+sts <- apply (cirrhosis_prediction_2, MARGIN = 2, FUN = function(x) (SoftMax (x,lambda = 2, mean(x), sd(x))))
+boxplot (sts, main = "Soft Max, lambda = 2")
+sts <- apply (cirrhosis_prediction_2, MARGIN = 2, FUN = function(x) (SoftMax (x,lambda = 3, mean(x), sd(x))))
+boxplot (sts, main = "Soft Max, lambda = 3")
+
+sts <- apply (cirrhosis_prediction_2, MARGIN = 2, FUN = function(x) (SoftMax (x,lambda = 4, mean(x), sd(x))))
+boxplot (sts, main = "Soft Max, lambda = 4")
+sts <- apply (cirrhosis_prediction_2, MARGIN = 2, FUN = function(x) (SoftMax (x,lambda = 5, mean(x), sd(x))))
+boxplot (sts, main = "Soft Max, lambda = 5")
+#Visualiztion with Heatmap (Histogram)
+data <- data.frame(cirrhosis_prediction$ID, 
+                   cirrhosis_prediction$N_Days, 
+                   cirrhosis_prediction$Age,
+                   cirrhosis_prediction$Platelets,
+                   cirrhosis_prediction$Bilirubin,
+                   cirrhosis_prediction$Albumin,
+                   cirrhosis_prediction$Prothrombin,
+                   cirrhosis_prediction$Platelets,
+                   cirrhosis_prediction$Stage,
+                   cirrhosis_prediction$lifeExpectancy)
+
+pairs(data)
+#checking normality for the dependent variable (lifeExpectancy):
+ks.test(cirrhosis_prediction$lifeExpectancy,"pnorm", mean(cirrhosis_prediction$lifeExpectancy), sd(cirrhosis_prediction$lifeExpectancy))
+# Correlations among numeric variables:
+cor.matrix <- cor(cirrhosis_prediction_2, use = "pairwise.complete.obs", method = "pearson")
+round (cor.matrix, digits = 2)
+cor.df <- as.data.frame(cor.matrix)
+View(cor.df)
+round(cor.df,2)
+#Co-relation Map:
+library(corrgram)
+corrgram (cirrhosis_prediction_2, order=FALSE, cor.method = "pearson", lower.panel=panel.cor,
+         upper.panel=panel.pie, text.panel=panel.txt, main="Patients with CLD  (pearson correlation)")
+#partial correlation:
+library(ppcor)
+#Calculate partial correlation using Pearson:
+pcor.test (cirrhosis_prediction_2$Age, cirrhosis_prediction_2$Bilirubin, cirrhosis_prediction_2$lifeExpectancy)
+pcor.test (cirrhosis_prediction_2$Age, cirrhosis_prediction_2$lifeExpectancy, cirrhosis_prediction_2$Bilirubin)
+ggplot (cirrhosis_prediction, aes(x=lifeExpectancy,N_Days))+geom_point(aes(color = factor(Status)))+ggtitle("Life Expectancy")+theme_bw() 
+#Scatterplot for lifeExpectancy and Bilirubin level:
+# Add regression line to scatter plot:
+model1 <- plot (cirrhosis_prediction$lifeExpectancy, cirrhosis_prediction$Bilirubin, main = "Scatterplot",
+     xlab = "Life Expectancy", ylab = "Bilirubin level")
+abline (model1, col = "red")
+# Test dependent variable for normality graphically:
+#QQ plot for the variable lifeExpectancy:
+qqnorm (cirrhosis_prediction_2$lifeExpectancy, xlab = "Theoretical Quantiles: Life Expectancy in Liver Disease")
+qqline (cirrhosis_prediction_2$lifeExpectancy, col = 2) ## red color
+#Splitting training and testing set for prediction - SECTION 2:
+set.seed(1)
+sample <- sample(nrow(cirrhosis_prediction),floor(0.60*nrow(cirrhosis_prediction)))
+train_data <- cirrhosis_prediction[sample,]
+test_data <- cirrhosis_prediction[-sample,]
+#Remove missing values from training and testing data:
+train_data_clean <- na.omit(train_data)
+test_data_clean <- na.omit(test_data)
+#PREDICTION USING MACHINE LEARNING TECHNIQUES - SECTION 3:
+#load required library:
+library(ggplot2)
+#As the dependent variable is normally distributed in qq plot the linear regression can be performed:
+#Linear Regression:
+lm_model <- lm (lifeExpectancy~., data = train_data_clean)
+summary(lm_model)
+#predict on test data:
+lm_predictions <- predict (lm_model, newdata = test_data_clean)
+#calculate accuracy:
+actual_values <- test_data_clean$lifeExpectancy
+mse <- mean ((actual_values - lm_predictions) ^2) # Mean Squared Error
+rmse <- sqrt (mse) #Root Mean Squared Error
+#print accuracy:
+cat ("Mean Squared Error (MSE) : ", mse, "\n")
+cat ("Root Mean Squared Error (RMSE):", rmse, "\n")
+#create a Scatter plot:
+ggplot()+ geom_point (data = test_data_clean, aes(x=lifeExpectancy, y= lm_predictions), color = "blue", size =3, alpha = 0.7) +
+  geom_abline (intercept = coef(lm_model) [1], slope = coef(lm_model) [2], color = "red", size = 1) +
+  labs (x= "Actual Life Expectancy", y= "Predicted Life Expectancy")+
+  ggtitle ("Linear Regression : Actual vs Predicted Life Expectancy")+
+  theme_minimal()
+#Multi-Linear Regression:
+mlr_model <- lm(lifeExpectancy ~., data = train_data_clean)
+summary(mlr_model)
+#predict on the test data:
+mlr_predictions <- predict (mlr_model, newdata= test_data_clean)
+#calculate accuracy:
+actual_values <- test_data_clean$lifeExpectancy
+mse <- mean ((actual_values - mlr_predictions) ^2) # Mean Squared Error
+rmse <- sqrt (mse) #Root Mean Squared Error
+#print accuracy:
+cat ("Mean Squared Error (MSE) : ", mse, "\n")
+cat ("Root Mean Squared Error (RMSE):", rmse, "\n")
+#create a Scatter plot:
+ggplot()+ geom_point (data = test_data_clean, aes(x=lifeExpectancy, y= mlr_predictions), color = "red", size =3, alpha = 0.7) +
+  geom_abline (intercept = coef(mlr_model) [1], slope = coef(mlr_model)[2], color = "black", size = 1) +
+  labs (x= "Actual Life Expectancy", y= "Predicted Life Expectancy")+
+  ggtitle ("Multi-Linear Regression : Actual vs Predicted Life Expectancy")+
+  theme_minimal() 
+#Random Forest Technique:
+set.seed(1)
+model2<-lm (lifeExpectancy~., data = train_data_clean)
+summary(model2)
+#Train model using Random Forest algorithm:
+pred2<-predict (model2, newdata = test_data_clean)
+# Predict life expectancy using the test dataset Random Forest:
+predictions <- predict (model2, test_data_clean)
+cor(cirrhosis_prediction[c("N_Days","lifeExpectancy")])
+# Fitting Random Forest Regression to the dataset:
+#Load required library:
+library(randomForest)
+set.seed(1234)
+regressor_rf = randomForest (x = train_data_clean [1],
+                             y = train_data_clean$lifeExpectancy,
+                             ntree = 30)
+# Predicting a new result with Random Forest Regression:
+pred2<-predict (model2, newdata = test_data_clean)
+Pred_Actual_rf <- as.data.frame(cbind(Prediction = pred2, Actual = test_data_clean$lifeExpectancy))
+# Calculate accuracy:
+sqrt(mean((test_data_clean$lifeExpectancy) ^2))
+gg.rf <- ggplot(Pred_Actual_rf, aes(Actual, predictions )) + geom_point()+
+  theme_bw() + geom_abline() +
+  labs (title = "Random Forest Regression", x = "Actual Life Expectancy",
+        y = "Predicted Life Expectancy") +
+  theme (plot.title = element_text(family = "Helvetica", face = "bold", size = (15)), 
+         axis.title = element_text(family = "Helvetica", size = (10)))
+gg.rf
+#Decision Tree Regression model:
+# Fitting Decision Tree Regression to the dataset:
+#Load the required library:
+library(rpart)
+regressor_dt = rpart (formula = lifeExpectancy ~.,
+                      data = train_data_clean,
+                      control = rpart.control(minsplit = 10))
+# Predicting a new result with Decision Tree Regression:
+y_pred_dt = predict (regressor_dt, newdata = test_data_clean)
+Pred_Actual_dt <- as.data.frame(cbind(Prediction = y_pred_dt, Actual = test_data_clean$lifeExpectancy))
+library(ggplot2)
+gg.dt <- ggplot(Pred_Actual_dt, aes(Actual, Prediction )) +
+  geom_point() + theme_bw() + geom_abline() +
+  labs (title = "Decision Tree Regression", x = "Actual Life Expectancy",
+        y = "Predicted Life Expectancy") +
+  theme (plot.title = element_text(family = "Helvetica", face = "bold", size = (15)), 
+         axis.title = element_text(family = "Helvetica", size = (10)))
+gg.dt
+# Plotting the tree:
+library(rpart.plot)
+prp(regressor_dt)
+#Gaussian Naive Bayes:
+#load required library:
+library(e1071)
+#Fit the Gaussian Naive Bayes model:
+nb_model <- naiveBayes(lifeExpectancy~., data = train_data_clean)
+nb_model
+#predict on the test data:
+nb_predictions <- predict (nb_model, newdata = test_data_clean)
+#create a data frame with the predicted values:
+nb_predictions_df <- data.frame(Predicted = nb_predictions, stringsAsFactors = FALSE)
+#create a bar plot of predicted values as it is a continuous function:
+ggplot (data= nb_predictions_df, aes (x= Predicted))+ 
+  geom_bar (aes(y=(..count..)/sum(..count..)),width = 0.5, fill = "steelblue")+
+  labs(x= "Predicted Values", y="Proportion", title = "Predicted Values Distribution")+
+  theme_minimal()
+#SVM Support Vector Machines:
+#load required libraries:
+library(ggplot2)
+library(e1071)
+#set seed for reproducibility:
+set.seed(123)
+#Fit the SVM model:
+svm_model <- svm (lifeExpectancy ~., data= train_data_clean)
+svm_model
+#predict on test data:
+svm_predictions <- predict (svm_model, newdata = test_data_clean)
+#create a data frame with the predicted values:
+svm_predictions_df <- data.frame (Predicted = svm_predictions, stringsAsFactors = FALSE)
+#create a bar plot of predicted values as it is a continuous function:
+ggplot (data= svm_predictions_df, aes (x= Predicted))+ 
+  geom_bar (aes(y=(..count..)/sum(..count..)),width = 0.1, fill = "pink")+
+  labs(x= "Predicted Values", y="Proportion", title = "Predicted Values Distribution")+
+  theme_minimal()
+#SURVIVAL ANALYSIS (RECOVERY TIME ANALYSIS) BY USING MACHINE LEARNING TECHNIQUES – SECTION 4:
+#Kaplan-Meier Analysis Test:
+#Inserting Dummy variables:
+cirrhosis_prediction$Status=factor (cirrhosis_prediction$Status, levels<-c('D','C','CL'), levels<-c (1,0,0)) #Dummy 'Death' to'1','Censored' to '0','CL_censored due to liver tx' to '0'
+cirrhosis_prediction$Drug=factor (cirrhosis_prediction$Drug, levels<-c('D-penicillamine','Placebo'), levels<-c (1,0)) #dummy 'Penicilliamine' to '1’, placebo to '0'
+cirrhosis_prediction$Sex=factor (cirrhosis_prediction$Sex, levels<-c('F','M'), levels<-c (1,2)) #male to '1', female to '2'
+cirrhosis_prediction$Ascites=factor (cirrhosis_prediction$Ascites, levels<-c('Y','N'), levels<-c (1,0)) # 'Y' to '1','N' to '0'
+cirrhosis_prediction$Hepatomegaly=factor (cirrhosis_prediction$Hepatomegaly, levels<-c('Y','N'), levels<-c (1,0)) 
+cirrhosis_prediction$Spiders=factor (cirrhosis_prediction$Spiders, levels<-c('Y','N'), levels<-c (1,0))
+cirrhosis_prediction$Edema=factor (cirrhosis_prediction$Edema, levels<-c('Y','N','S'), levels<-c (1,0,3)) #N to no edima & diuretic,Y present both,S only edima
+View(cirrhosis_prediction)
+sf<-table(cirrhosis_prediction$Status)
+sf
+Drugf<-table(cirrhosis_prediction$Drug)
+Drugf
+Sexf<-table(cirrhosis_prediction$Sex)
+Sexf
+Ascitesy<-table(cirrhosis_prediction$Ascites)
+Ascitesy
+Hepatof<-table(cirrhosis_prediction$Hepatomegaly)
+Hepatof
+Spiders<-table(cirrhosis_prediction$Spiders)
+Spiders
+Edm<-table(cirrhosis_prediction$Edema)
+Edm
+#Remove the missing variables from all variables:
+cirrhosis_prediction$Cholesterol[is.na(cirrhosis_prediction$Cholesterol)] <-median (cirrhosis_prediction$Cholesterol, na.rm = TRUE)
+cirrhosis_prediction$Copper[is.na(cirrhosis_prediction$Copper)] <-median (cirrhosis_prediction$Copper, na.rm = TRUE)
+cirrhosis_prediction$Alk_Phos[is.na(cirrhosis_prediction$Alk_Phos)] <-median (cirrhosis_prediction$Alk_Phos, na.rm = TRUE)
+cirrhosis_prediction$SGOT [is.na(cirrhosis_prediction$SGOT)] <-median (cirrhosis_prediction$SGOT, na.rm = TRUE)
+cirrhosis_prediction$Cholesterol[is.na(cirrhosis_prediction$Cholesterol)] <-median (cirrhosis_prediction$Cholesterol, na.rm = TRUE)
+cirrhosis_prediction$Tryglicerides[is.na(cirrhosis_prediction$Tryglicerides)] <-median (cirrhosis_prediction$Tryglicerides, na.rm = TRUE)
+cirrhosis_prediction$Platelets[is.na(cirrhosis_prediction$Platelets)] <-median (cirrhosis_prediction$Platelets, na.rm = TRUE)
+cirrhosis_prediction$Prothrombin[is.na(cirrhosis_prediction$Prothrombin)] <-median (cirrhosis_prediction$Prothrombin, na.rm = TRUE)
+cirrhosis_prediction$Stage[is.na(cirrhosis_prediction$Stage)] <-median (cirrhosis_prediction$Stage, na.rm = TRUE)
+cirrhosis_prediction$lifeExpectancy[is.na(cirrhosis_prediction$lifeExpectancy)] <-median (cirrhosis_prediction$lifeExpectancy, na.rm = TRUE)
+# Load the library:
+library("survival")
+# Create the survival object:
+sfit<-survfit (Surv(cirrhosis_prediction$N_Days,cirrhosis_prediction$Status==1 )~1,data = cirrhosis_prediction)
+summary(sfit)
+sfit<-survfit (Surv(cirrhosis_prediction$N_Days,cirrhosis_prediction$Status==0 )~1,data = cirrhosis_prediction)
+summary(sfit)
+#Fit by sex:
+sfit<-survfit (Surv(cirrhosis_prediction$N_Days, cirrhosis_prediction$Status==1)~Sex,data = cirrhosis_prediction)
+summary(sfit)
+#Fit by life Expectancy:
+sfit<-survfit (Surv(cirrhosis_prediction$lifeExpectancy, cirrhosis_prediction$Status==1)~lifeExpectancy,data = cirrhosis_prediction)
+summary(sfit)
+#km plot:
+sfit<-survfit (Surv(cirrhosis_prediction$N_Days, cirrhosis_prediction$Status==1)~Sex,data = cirrhosis_prediction)
+plot(sfit)
+library(survminer)
+#Kaplan-Meier Survival plot:
+ggsurvplot(sfit)
+ggsurvplot (sfit, data = cirrhosis_prediction, conf.int = TRUE,
+            pval = TRUE,
+            fun = "pct",
+            risk.table = TRUE,
+            size = 1,
+            linetype = "strata",
+            palette = c ("black", "orchid"),title="Kaplan-Meier Curve for Cirrhosis Life Expectancy Prediction",
+            legend = "bottom",
+            legend.title = "Sex",
+            legend.labs = c("Male",
+                            "Female"))
+#Cox-Proportional Model:
+library(survival)
+coxm<-coxph (Surv(cirrhosis_prediction$N_Days,cirrhosis_prediction$Status)~Drug+Age+Sex+Ascites+Hepatomegaly+Spiders+Edema+Bilirubin+Cholesterol+Albumin+Copper+Alk_Phos+SGOT+Tryglicerides+Platelets+Prothrombin+Stage+lifeExpectancy,id=ID,data = cirrhosis_prediction)
+#Load the required library:
+library(car)
+vif(coxm)
+summary(coxm)
+ggforest (coxm,data = cirrhosis_prediction)
+#Diagnostics of Cox Model:
+ftestcox<-cox.zph(coxm)
+ftestcox
+library(survminer)
+ggcoxzph(ftestcox)
+#Analysing Difference between Kaplan-Meier and Cox-Proportional Survival analysis by log-Rank Test:
+#Fit the model by using weibull and flexible parametric model which is also used to obtain qq plot for visualization:
+set.seed(20180925)
+# Define a function for analysing one simulated dataset:
+sim_run <- function () {
+  # Create a data frame with the subject IDs and treatment covariate:
+  cov <- data.frame(ID = 1:2000,
+                    trt = rbinom (2000, 1, 0.5))
+  # Simulate the event times:
+  dat <- simsurv (lambdas = 0.1, 
+                  gammas = 1.5, 
+                  betas = c(Sex=1), 
+                  x = cov, 
+                  maxt = 5)
+  # Merge the simulated event times onto covariate data frame:
+  dat <- merge (cov, cirrhosis_prediction) 
+  # Fit a Weibull proportional hazards model:
+  mod <- flexsurv::flexsurvspline(Surv(eventtime, status) ~ Sex, data = cirrhosis_prediction)
+  # Obtain estimates, standard errors and 95% CI limits:
+  est <- mod$coefficients[["Sex"]]
+  ses <- sqrt(diag(mod$cov)) [["Sex"]]
+  cil <- est + qnorm (.025) * ses
+  ciu <- est + qnorm (.975) * ses
+  # Return bias and coverage indicator for treatment effect:
+  c (bias = est - (-0.5), 
+     coverage = ((-0.5 > cil) && (-0.5 < ciu)))
+}
+
+# Set seed for simulations:
+set.seed(908070)
+data.class(cirrhosis_prediction)
+library(flexsurv)
+# Fit the Weibull survival model:
+mod_weib <- flexsurvspline(Surv(N_Days,Status==1) ~Drug+Bilirubin+Prothrombin+Copper+lifeExpectancy
+                           , data = cirrhosis_prediction, k = 0)
+
+# Fit the flexible parametric survival model:
+mod_flex <- flexsurv::flexsurvspline(Surv(N_Days,Status==1) ~ Drug+Bilirubin+Prothrombin+Copper+lifeExpectancy, 
+                                     data = cirrhosis_prediction, k = 3)
+par (mfrow = c(1,2), cex = 0.85) 
+# graphics parameters:
+plot (mod_weib,
+      main = "Weibull model",
+      ylab = "Life Expectancy (survival probability)",
+      xlab = "Time") 
+plot (mod_flex,
+      main = "Flexible parametric model",
+      ylab = "Life Expectancy (survival probability)",
+      xlab = "Time")
+# Set a seed for the simulations:
+set.seed(543543)
+# Summary of the model simulated:
+survfitw<-survreg(Surv(N_Days,Status==0)~.,dist = "weibull",data = cirrhosis_prediction)
+summary(survfitw)
+survfitw
+survfite<-survreg(Surv(N_Days,Status==1)~.,dist = "exponential",data = cirrhosis_prediction)
+summary(survfite)
+survfitln<-survreg(Surv(N_Days,Status==1)~.,dist = "lognormal",data = cirrhosis_prediction)
+summary(survfitln)
+survfitlg<-survreg(Surv(N_Days,Status==1)~.,dist = "loglogistic",data = cirrhosis_prediction)
+summary(survfitlg)
+#km plot (ROC curve):
+sfit<-survfit (Surv(cirrhosis_prediction$N_Days, cirrhosis_prediction$Status==1)~Sex,data = cirrhosis_prediction)
+plot(sfit)
+#Deatching the data set from Global Environment:
+detach ()
